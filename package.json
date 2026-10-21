@@ -1,0 +1,25 @@
+{
+  "name": "blaulichtbooking",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PIN-protected fire brigade vehicle booking with email approval",
+  "engines": {
+    "node": ">=24.0.0 <25"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test --test-concurrency=1",
+    "lint": "node scripts/check.js",
+    "build": "node scripts/check.js",
+    "migrate": "node scripts/migrate.js",
+    "backup": "node scripts/backup.js"
+  },
+  "dependencies": {
+    "@js-temporal/polyfill": "^0.5.1",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "nodemailer": "^10.1.7"
+  }
+}
