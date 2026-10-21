@@ -88,6 +88,9 @@ Beim Einsatz zusätzlicher CDN-/Proxy-Schichten die tatsächliche Vertrauenskett
 `.env` konfigurieren, insbesondere `APP_KEY`, Bootstrap-Zugang, SMTP und eine externe HTTPS-`BASE_URL`.
 
 ```sh
+mkdir -p backups
+# Linux: make the host backup directory writable for the container user (UID 1000).
+sudo chown 1000:1000 backups
 docker compose up -d --build
 docker compose logs -f booking
 ```
