@@ -27,8 +27,8 @@ async function connect() {
       decimalAsNumber: true,
       checkNumberRange: true,
       connectTimeout: 10000,
+      // A socket deadline works on both servers; queryTimeout is MariaDB-only.
       socketTimeout: 20000,
-      queryTimeout: 15000,
       multipleStatements: false,
       trace: false,
       logParam: false,
