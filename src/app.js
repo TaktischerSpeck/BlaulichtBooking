@@ -232,7 +232,7 @@ export function createApp(service, integrations) {
           config.google.email && config.google.privateKey,
         ),
         retentionDays: config.retentionDays,
-        databaseType: s.db.kind === 'mariadb' ? 'MariaDB / MySQL' : 'SQLite',
+        databaseType: s.db.kind === "mariadb" ? "MariaDB / MySQL" : "SQLite",
       },
     }),
   );
@@ -240,13 +240,18 @@ export function createApp(service, integrations) {
     const status = String(req.query.status || ""),
       search = String(req.query.search || "").slice(0, 100),
       vehicle = String(req.query.vehicleId || "");
-    const start = req.query.startDate ? dayBounds(req.query.startDate).start : Number(req.query.start || 0),
-      end = req.query.endDate ? dayBounds(req.query.endDate).end : Number(req.query.end || 9999999999999);
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) fail('Ungültiger Filterzeitraum.');
+    const start = req.query.startDate
+        ? dayBounds(req.query.startDate).start
+        : Number(req.query.start || 0),
+      end = req.query.endDate
+        ? dayBounds(req.query.endDate).end
+        : Number(req.query.end || 9999999999999);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start)
+      fail("Ungültiger Filterzeitraum.");
     res.json(
       s
         .all(
-          `SELECT DISTINCT b.id FROM bookings b JOIN reservations r ON r.booking_id=b.id WHERE (?='' OR b.status=?) AND b.name LIKE ?
+          `SELECT DISTINCT b.id,b.created FROM bookings b JOIN reservations r ON r.booking_id=b.id WHERE (?='' OR b.status=?) AND b.name LIKE ?
       AND (?='' OR r.vehicle_id=?) AND b.start<? AND b.end>? ORDER BY b.created DESC LIMIT 300`,
           status,
           status,
@@ -532,14 +537,12 @@ export function createApp(service, integrations) {
     const status = error.status || 500;
     if (status >= 500)
       console.error(`Request failed: ${req.method} ${req.path} (${status})`);
-    res
-      .status(status)
-      .json({
-        message:
-          status >= 500
-            ? "Die Aktion konnte nicht ausgeführt werden. Bitte Einstellungen und Verbindungsstatus prüfen."
-            : error.message,
-      });
+    res.status(status).json({
+      message:
+        status >= 500
+          ? "Die Aktion konnte nicht ausgeführt werden. Bitte Einstellungen und Verbindungsstatus prüfen."
+          : error.message,
+    });
   });
   return app;
 }

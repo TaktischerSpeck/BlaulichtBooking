@@ -7,6 +7,7 @@ import { Integrations } from "../src/integrations.js";
 import { mariaSql } from "../src/mariadb-sql.js";
 import { fixture, input, pending, approve, token } from "./helpers.js";
 import { createSetupApp } from "../src/setup.js";
+import { createApp } from "../src/app.js";
 import { mkdtempSync, rmSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -204,6 +205,63 @@ test(
       "pending",
     );
     assert.equal(approve(s, b.id, "a", ["v2"], "reject").status, "rejected");
+  },
+);
+test(
+  "SQL-backed calendar and admin listing endpoints preserve ordering, filters and privacy",
+  { skip: !enabled },
+  async (t) => {
+    const s = sqlFixture(t),
+      b = pending(s, { vehicleIds: ["v1", "v2"] });
+    approve(s, b.id, "a", ["v1", "v2"]);
+    const server = createApp(s, new Integrations(s)).listen(0, "127.0.0.1");
+    await new Promise((resolve) => server.once("listening", resolve));
+    const origin = `http://127.0.0.1:${server.address().port}`;
+    s.config.baseUrl = origin;
+    let cookie = "",
+      csrf = "";
+    async function request(path, body) {
+      const response = await fetch(origin + "/api" + path, {
+        method: body ? "POST" : "GET",
+        headers: {
+          Origin: origin,
+          Cookie: cookie,
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrf,
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      if (response.headers.get("set-cookie"))
+        cookie = response.headers.get("set-cookie").split(";")[0];
+      const result = await response.json();
+      if (result.csrf) csrf = result.csrf;
+      assert.equal(response.status, 200, JSON.stringify(result));
+      return result;
+    }
+    try {
+      await request("/session");
+      await request("/pin", { pin: "1234" });
+      const calendar = await request(
+        `/calendar?start=${b.start - 1}&end=${b.end + 1}`,
+      );
+      assert.equal(calendar.bookings.length, 1);
+      assert.equal(calendar.bookings[0].email, undefined);
+      await request("/admin/login", {
+        username: "admin",
+        password: "test-password-very-long",
+      });
+      const rows = await request(
+        "/admin/bookings?status=approved&vehicleId=v1",
+      );
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].id, b.id);
+      assert.equal(
+        (await request("/admin/overview")).settings.databaseType,
+        "MariaDB / MySQL",
+      );
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
   },
 );
 test(

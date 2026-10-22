@@ -619,7 +619,7 @@ export class BookingService {
   }
   calendar(start, end, vehicleId = "") {
     const bookings = this.all(
-      "SELECT DISTINCT b.id FROM bookings b JOIN reservations r ON r.booking_id=b.id WHERE b.status IN ('pending','approved','completed') AND b.start<? AND b.end>? AND (?='' OR r.vehicle_id=?) ORDER BY b.start",
+      "SELECT DISTINCT b.id,b.start FROM bookings b JOIN reservations r ON r.booking_id=b.id WHERE b.status IN ('pending','approved','completed') AND b.start<? AND b.end>? AND (?='' OR r.vehicle_id=?) ORDER BY b.start",
       end,
       start,
       vehicleId,
