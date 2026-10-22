@@ -83,7 +83,12 @@ export function createSetupApp(env = process.env, onComplete = () => {}) {
     const type = input.databaseType || "mariadb";
     if (!["mariadb", "mysql", "sqlite"].includes(type))
       fail("Ungültiger Datenbanktyp.");
-    const baseUrl = new URL(text(input.baseUrl, "Website-URL", 500));
+    let baseUrl;
+    try {
+      baseUrl = new URL(text(input.baseUrl, "Website-URL", 500));
+    } catch {
+      fail("Bitte eine gültige Website-Adresse eingeben.");
+    }
     if (
       !["http:", "https:"].includes(baseUrl.protocol) ||
       baseUrl.username ||
@@ -191,11 +196,9 @@ export function createSetupApp(env = process.env, onComplete = () => {}) {
   const publicPath = fileURLToPath(new URL("../public/", import.meta.url));
   app.get("/", (req, res) => res.sendFile(`${publicPath}/setup.html`));
   app.get("/api/session", (req, res) =>
-    res
-      .status(503)
-      .json({
-        message: "Bitte zuerst die Einrichtung auf der Startseite abschließen.",
-      }),
+    res.status(503).json({
+      message: "Bitte zuerst die Einrichtung auf der Startseite abschließen.",
+    }),
   );
   app.get("/healthz", (req, res) => res.json({ status: "setup-required" }));
   app.use(express.static(publicPath, { index: false, maxAge: 0 }));
@@ -205,18 +208,15 @@ export function createSetupApp(env = process.env, onComplete = () => {}) {
       console.error(
         "Initial setup failed (" + (error.code || "CONFIGURATION_ERROR") + ")",
       );
-    res
-      .status(code)
-      .json({
-        message:
-          code < 500
-            ? error.message
-            : error.code
-              ? "Datenbankverbindung fehlgeschlagen (" +
-                error.code +
-                "). Bitte Server, Datenbankname, Benutzer, Passwort und Berechtigungen in Plesk prüfen."
-              : "Einrichtung fehlgeschlagen. Bitte Konfiguration und Schreibrechte für das Datenverzeichnis prüfen.",
-      });
+    res.status(code).json({
+      message: error.status
+        ? error.message
+        : error.code
+          ? "Datenbankverbindung fehlgeschlagen (" +
+            error.code +
+            "). Bitte Server, Datenbankname, Benutzer, Passwort und Berechtigungen in Plesk prüfen."
+          : "Einrichtung fehlgeschlagen. Bitte Konfiguration und Schreibrechte für das Datenverzeichnis prüfen.",
+    });
   });
   return app;
 }

@@ -103,7 +103,9 @@ test("browser setup creates keys/schema/admin without CLI and persists across re
 });
 test("installer refuses missing setup protection and rate-limits guesses", async (t) => {
   const missing = await setupFixture(t, { SETUP_TOKEN: "" });
-  assert.equal((await missing.submit()).status, 503);
+  const response = await missing.submit();
+  assert.equal(response.status, 503);
+  assert.match(response.body.message, /SETUP_TOKEN/);
   const f = await setupFixture(t);
   for (let n = 0; n < 5; n++)
     assert.equal(
