@@ -9,3 +9,5 @@ coverage/
 *.sqlite*
 *.pem
 google-credentials.json
+runtime.json
+runtime.json.*

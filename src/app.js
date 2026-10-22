@@ -232,6 +232,7 @@ export function createApp(service, integrations) {
           config.google.email && config.google.privateKey,
         ),
         retentionDays: config.retentionDays,
+        databaseType: s.db.kind === 'mariadb' ? 'MariaDB / MySQL' : 'SQLite',
       },
     }),
   );

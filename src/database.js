@@ -3,8 +3,11 @@ import { mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { hashPassword } from "./security.js";
+import { MariaDatabase } from "./mariadb.js";
 
 export function openDatabase(path) {
+  if (typeof path === "object" && path?.client === "mariadb")
+    return new MariaDatabase(path.connection);
   if (path !== ":memory:")
     mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const db = new DatabaseSync(path);
@@ -33,7 +36,11 @@ export function transaction(db, action) {
     db.exec("COMMIT");
     return result;
   } catch (error) {
-    db.exec("ROLLBACK");
+    try {
+      db.exec("ROLLBACK");
+    } catch {
+      /* Preserve the original transaction failure. */
+    }
     throw error;
   }
 }

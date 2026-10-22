@@ -1,6 +1,6 @@
 # BlaulichtBooking
 
-Fahrzeugbuchung für die Feuerwehr: mobil bedienbar, mit gemeinsamer PIN, individuellen E-Mail-Freigaben und einem eigenen Belegungskalender. Plesk und Docker verwenden denselben Node.js-Code und dieselbe SQLite-Datenbank.
+Fahrzeugbuchung für die Feuerwehr: mobil bedienbar, mit gemeinsamer PIN, individuellen E-Mail-Freigaben und einem eigenen Belegungskalender. Plesk und Docker verwenden denselben Node.js-Code. Unterstützt werden MariaDB/MySQL und optional SQLite. Die Ersteinrichtung läuft im Browser.
 
 ## Funktionsumfang
 
@@ -10,7 +10,7 @@ Fahrzeugbuchung für die Feuerwehr: mobil bedienbar, mit gemeinsamer PIN, indivi
 - E-Mail-Bestätigung vor Weiterleitung an die Verantwortlichen. Antragsteller und Freigabepersonen brauchen keine Konten.
 - Eigene Freigabegruppe je Fahrzeug: eine Person entscheidet, alle stimmen zu oder x aus n stimmen zu. Freigaberegel und berechtigte Personen werden pro Anfrage festgehalten.
 - Gesamtgenehmigung erst nach Freigabe aller Fahrzeuge. Bei endgültiger Ablehnung eines Fahrzeugs wird die gesamte Anfrage abgelehnt.
-- Offene Anfragen erzeugen Hinweise. Bestätigte Buchungen und Sperren verhindern die Genehmigung. Eine SQLite-Transaktion mit `BEGIN IMMEDIATE` schützt die abschließende Prüfung auch bei parallelen Prozessen.
+- Offene Anfragen erzeugen Hinweise. Bestätigte Buchungen und Sperren verhindern die Genehmigung. Die abschließende Prüfung läuft transaktional: SQLite verwendet `BEGIN IMMEDIATE`, MariaDB/MySQL zusätzlich eine verbindungsgebundene Datenbanksperre, die auch getrennte Plesk-Prozesse koordiniert.
 - Persönliche Verwaltungslinks für Status, Änderungen und Stornierung. Jede Änderung nimmt die bisherige Genehmigung zurück und startet die Freigabe neu.
 - Monats-, Wochen- und Tagesansicht; Fahrzeugfilter und sichtbare Statusbeschriftungen. Buchende sind namentlich sichtbar, E-Mail-Adressen und Bemerkungen werden nicht über die Kalender-API ausgegeben.
 - Verwaltung von Fahrzeugen, Freigabepersonen, Sperren, Buchungen, Zugang, Protokoll und Verbindungsstatus. Direkte Admin-Buchungen mit verbindlicher Konfliktprüfung sind ebenfalls enthalten.
@@ -20,7 +20,39 @@ Fahrzeugbuchung für die Feuerwehr: mobil bedienbar, mit gemeinsamer PIN, indivi
 
 Die vollständige Anforderungsspezifikation liegt unter [docs/specification.md](docs/specification.md). Anpassbare Mailvorlagen, Erinnerungen, Serienbuchungen und der Import externer Google-Termine sind spätere Erweiterungen.
 
-## Lokal starten
+## Plesk mit Node.js – ohne SSH und ohne CLI
+
+Die Einrichtung benötigt nur die Plesk-Oberfläche und anschließend den Browser. Es gibt keinen separaten Build-Schritt, keine manuell auszuführenden Migrationen und keinen Befehl zum Erzeugen des Anwendungsschlüssels.
+
+1. **Website vorbereiten:** Domain oder Subdomain in Plesk anlegen und ein gültiges SSL-Zertifikat aktivieren. Unter „Hosting-Einstellungen“ HTTP auf HTTPS umleiten.
+2. **Dateien bereitstellen:** Über die Plesk-Git-Erweiterung dieses Repository in einen Anwendungsordner bereitstellen, beispielsweise `booking-app`. Alternativ das Repository als ZIP herunterladen und über den Plesk-Dateimanager hochladen und entpacken. Der Ordner muss `package.json`, `app.cjs`, `src` und `public` enthalten.
+3. **Datenbank anlegen:** In Plesk unter **Datenbanken → Datenbank hinzufügen** eine neue leere MariaDB-/MySQL-Datenbank und einen zugeordneten Benutzer mit Zugriff auf diese Datenbank erstellen. Datenbankname, Benutzer und Passwort merken. Die Anwendung benötigt Rechte für Tabellenanlage, Indizes, Fremdschlüssel und Datenänderungen innerhalb dieser Datenbank, aber keine globalen Administratorrechte.
+4. **Node.js einstellen:** In Plesk den Bereich **Node.js** öffnen und diese Werte setzen:
+
+   | Einstellung                              | Wert                 |
+   | ---------------------------------------- | -------------------- |
+   | Node.js-Version                          | **24 LTS**           |
+   | Anwendungsmodus                          | **Production**       |
+   | Anwendungsverzeichnis / Application Root | `booking-app`        |
+   | Dokumentenstamm / Document Root          | `booking-app/public` |
+   | Startdatei / Application Startup File    | **`app.cjs`**        |
+
+5. **Einrichtung schützen:** Unter **Benutzerdefinierte Umgebungsvariablen** `SETUP_TOKEN` auf einen selbst gewählten, privaten Code mit mindestens 16 Zeichen setzen. `APP_KEY`, `INITIAL_PIN` und die Admin-Zugangsdaten für den Assistenten **nicht** als Variablen anlegen. Optional `APP_DATA_DIR` auf ein dauerhaftes, für den Domainbenutzer beschreibbares Verzeichnis **außerhalb von `public`** setzen. Ohne diese Variable wird `booking-app/data` verwendet.
+6. **Starten:** In Plesk **NPM installieren / NPM Install** anklicken, dann **App neu starten / Restart App**. Keine „Run Script“-Befehle erforderlich.
+7. **Im Browser einrichten:** Die HTTPS-Adresse der Website öffnen. Einrichtungscode eingeben, MariaDB/MySQL auswählen und die Datenbankdaten aus Plesk eintragen. Auf demselben Server ist der Host meist `127.0.0.1`, Port `3306`. Falls Plesk einen anderen Datenbankserver nennt, diesen verwenden. Website-PIN und Admin-Benutzer samt Passwort festlegen; SMTP kann direkt mit eingerichtet werden. Auf **„Verbindung prüfen & Einrichtung abschließen“** klicken.
+8. **Fahrzeuge anlegen:** Nach dem automatischen Wechsel zur normalen Website mit der neuen PIN öffnen. In **Verwaltung** anmelden, Freigabepersonen und Fahrzeuge anlegen. SMTP über **Betrieb & Einstellungen** testen. Nach erfolgreicher Einrichtung kann `SETUP_TOKEN` aus den Plesk-Variablen entfernt werden; der Assistent ist unabhängig davon gesperrt.
+
+Der Assistent prüft die Verbindung, legt Tabellen und Administrator an und erzeugt den Anwendungsschlüssel automatisch. Neustarts lesen die gespeicherte Konfiguration wieder ein. Datenbankzugang, SMTP-Einstellungen und Schlüssel liegen in `data/runtime.json` (bzw. unter `APP_DATA_DIR`) mit restriktiven Dateirechten. PIN, Admin-Passwort und Einrichtungscode stehen **nicht** in dieser Datei. Der öffentliche Dokumentenstamm darf ausschließlich `public` sein.
+
+**Updates:** In Plesk Git die Änderungen abrufen/bereitstellen, bei geänderten Abhängigkeiten auf **NPM installieren** klicken und **App neu starten**. Neue Datenbankmigrationen laufen automatisch beim Start. `data/runtime.json` und die Datenbank bei Deployments erhalten. Der Assistent wird bei Updates nicht erneut geöffnet.
+
+**Backups ohne CLI:** MariaDB/MySQL über **Plesk → Datenbanken → Dump exportieren** oder den **Backup-Manager** sichern. Zusätzlich über den Dateimanager `data/runtime.json` geschützt sichern; darin liegt der Schlüssel für noch ausstehende Mailaufgaben. Beim Wiederherstellen müssen Datenbank und Konfiguration zusammenpassen. Eine bereits gefüllte Datenbank wird vom Ersteinrichtungsassistenten nicht übernommen oder zurückgesetzt.
+
+**Verbindungsdaten ändern:** Bestehende Werte können in Plesk über `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `SMTP_HOST` usw. überschrieben werden. Danach **App neu starten**. Keine Dateibearbeitung oder CLI erforderlich. Der Wechsel von SQLite auf MariaDB verbindet eine andere Datenbank und überträgt vorhandene Buchungen nicht automatisch; für bestehende Daten vor einem Wechsel eine Datenübernahme planen.
+
+**Proxy:** Der Assistent verwendet standardmäßig einen vertrauenswürdigen Plesk-Proxy (`TRUST_PROXY=1`) und verlangt im Produktionsmodus HTTPS. Bei zusätzlichen CDN-/Proxy-Schichten die tatsächliche Vertrauenskette passend konfigurieren. Der direkte Node-Port soll nicht öffentlich erreichbar sein. Der CommonJS-Startpunkt ist lokal getestet; eine konkrete Plesk-Installation muss ihre Node.js-/Passenger-Unterstützung und passende Schreibrechte bereitstellen.
+
+## Lokal starten (Entwicklung, optional)
 
 Voraussetzung: **Node.js 24 LTS**. Die eingebaute SQLite-Unterstützung erspart native Datenbank-Abhängigkeiten. Ein einzelner Anwendungsserver mit lokalem persistentem Datenträger genügt; die SQLite-Datei darf nicht auf einem Netzwerkdateisystem oder zwischen mehreren Hosts geteilt werden.
 
@@ -44,6 +76,20 @@ Ohne SMTP bleiben Anfragen gespeichert, aber die Bestätigungs- und Freigabelink
 
 ## Konfiguration
 
+Für den Plesk-Assistenten genügt zunächst `SETUP_TOKEN` (mindestens 16 Zeichen). Dieser erzeugt und speichert alle Pflichtwerte. Die folgenden Variablen sind nur für direkte Konfiguration bzw. spätere Überschreibungen nötig:
+
+| Zusätzliche Variable                | Bedeutung                                                                                |
+| ----------------------------------- | ---------------------------------------------------------------------------------------- |
+| `SETUP_TOKEN`                       | Einmaliger Einrichtungscode, nur vor Erstinstallation benötigt                           |
+| `APP_DATA_DIR`                      | Dauerhaftes Datenverzeichnis außerhalb von `public`; Standard `./data`                   |
+| `DB_CLIENT`                         | `mariadb` oder `mysql`; ohne Angabe bleibt SQLite für bestehende Installationen erhalten |
+| `DB_HOST`, `DB_PORT`                | SQL-Server; Standard `127.0.0.1:3306`                                                    |
+| `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Bereits in Plesk angelegte Datenbank und zugeordneter Benutzer                           |
+| `DB_SSL`                            | `true` für TLS mit gültiger Server-Zertifikatskette bei externem Datenbankserver         |
+| `DB_SOCKET`                         | Optionaler lokaler Unix-Socket statt TCP                                                 |
+
+MariaDB **10.6+** und MySQL **8.0.16+** werden unterstützt. Der MariaDB-Connector enthält keine zu kompilierenden nativen Datenbankmodule. Jeder App-Prozess nutzt eine Verbindung in einem Worker; die bestehende synchrone Transaktionsgrenze wird für beide Datenbanken beibehalten. Das ist für die geringe gleichzeitige Last einer Feuerwehrbuchung ausgelegt. Bei MariaDB/MySQL schützt eine verbindungsgebundene Sperre vor parallelen finalen Freigaben.
+
 | Variable                                          | Bedeutung                                                                           |
 | ------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `APP_KEY`                                         | 64 Hex-Zeichen; Verschlüsselung der Warteschlange, unbedingt separat sichern        |
@@ -62,26 +108,7 @@ Ohne SMTP bleiben Anfragen gespeichert, aber die Bestätigungs- und Freigabelink
 | `GOOGLE_CLIENT_EMAIL`                             | E-Mail des Google Service Accounts                                                  |
 | `GOOGLE_PRIVATE_KEY`                              | Privater PEM-Schlüssel; in `.env` in Anführungszeichen mit `\n`-Zeichen             |
 
-Die Adresse im Browser muss zu `BASE_URL` passen (auch `localhost` und `127.0.0.1` sind unterschiedliche Origins). Verbindungsgeheimnisse kommen ausschließlich in die Serverumgebung und niemals ins Repository. `.env` und der Ordner `data` dürfen nicht über den Webserver ausgeliefert werden.
-
-## Plesk mit Node.js
-
-1. Repository über Plesk Git in ein **Anwendungsverzeichnis außerhalb des Document Roots** auschecken, beispielsweise `…/booking-app`.
-2. Unter Node.js **Node 24**, Produktionsmodus, Application Root `booking-app`, Document Root `booking-app/public` und Startup File **`app.cjs`** einstellen. Der CommonJS-Startpunkt lädt die ESM-Anwendung und ist für Passenger geeignet.
-3. Umgebungsvariablen aus `.env.example` in Plesk setzen. `NODE_ENV=production`, `BASE_URL=https://buchung.example.de`, `TRUST_PROXY=1`; die Domain muss ein gültiges TLS-Zertifikat haben. Plesk/Passenger kann `PORT` vorgeben, dieser wird berücksichtigt.
-4. `npm ci --omit=dev --ignore-scripts` und `npm run build` im Application Root mit der Plesk-Node-Version ausführen. Es gibt keinen separaten Frontend-Compiler: die Produktionsdateien liegen bereits in `public/`.
-5. Anwendung neu starten. HTTP auf HTTPS umleiten und den direkten Zugriff auf den internen Anwendungsport unterbinden. Der letzte vorgeschaltete Proxy muss `X-Forwarded-Proto` und die Client-IP zuverlässig setzen/überschreiben. Bei mehreren Proxy-Hops `TRUST_PROXY` passend konfigurieren.
-6. Nur dem Domain-Systembenutzer Schreibzugriff auf das Datenverzeichnis geben. Keine öffentlich erreichbare Datenbank erforderlich. Auch bei einem normalen Neustart muss das Datenverzeichnis erhalten bleiben.
-
-Beispiel für eine Plesk-Installation mit Node 24:
-
-```sh
-/opt/plesk/node/24/bin/node /opt/plesk/node/24/lib/node_modules/npm/bin/npm-cli.js ci --omit=dev --ignore-scripts
-/opt/plesk/node/24/bin/node scripts/check.js
-/opt/plesk/node/24/bin/node scripts/migrate.js
-```
-
-Beim Einsatz zusätzlicher CDN-/Proxy-Schichten die tatsächliche Vertrauenskette prüfen. Die Anwendung verweigert produktiv als unverschlüsselt erkannte Anfragen. Die Plesk-/Passenger-Konfiguration wurde in dieser Implementierungsumgebung nicht gegen einen echten Plesk-Server getestet.
+Die Adresse im Browser muss zu `BASE_URL` passen (auch `localhost` und `127.0.0.1` sind unterschiedliche Origins). Verbindungsgeheimnisse kommen aus dem geschützten Einrichtungsassistenten oder der Serverumgebung und niemals ins Repository. Nicht leere Umgebungsvariablen haben Vorrang vor `runtime.json`. `.env` und der Ordner `data` dürfen nicht über den Webserver ausgeliefert werden.
 
 ## Docker
 
@@ -124,7 +151,7 @@ Die eigene Datenbank ist führend. Extern angelegte Google-Termine verhindern ke
 
 ## Betrieb, Migrationen und Backups
 
-Migrationen aus `migrations/` werden in Reihenfolge und transaktional beim Start angewendet. Bereits angewendete Migrationen werden nicht erneut ausgeführt oder nachträglich verändert. `npm run migrate` führt sie separat aus. Vor Updates immer ein Backup erstellen.
+SQLite-Migrationen aus `migrations/` werden transaktional angewendet. MariaDB/MySQL verwendet `migrations/mariadb/`; dort laufen wiederholbar sichere DDL-Schritte unter einer Datenbanksperre, weil MySQL-DDL automatisch committet. Beide Varianten laufen beim Start automatisch. Bereits angewendete Migrationen werden nicht erneut ausgeführt oder nachträglich verändert. `npm run migrate` führt sie separat aus. Vor Updates immer ein Backup erstellen.
 
 ```sh
 npm run backup
@@ -132,7 +159,7 @@ npm run backup
 docker compose exec booking node scripts/backup.js
 ```
 
-Das Backup verwendet die SQLite-Backup-API und ist auch im laufenden Betrieb konsistent. Zusätzlich `APP_KEY` und die restliche Umgebung getrennt und geschützt sichern. Ohne denselben Schlüssel sind noch nicht zugestellte Warteschlangen-Einträge nicht lesbar. Backups enthalten personenbezogene Daten und müssen geschützt aufbewahrt und nach eigener Frist gelöscht werden.
+Das Backup verwendet die SQLite-Backup-API und ist auch im laufenden Betrieb konsistent. Für MariaDB/MySQL den Plesk-Datenbankexport verwenden; `npm run backup` ist ausschließlich für SQLite vorgesehen. Zusätzlich `APP_KEY` und die restliche Umgebung getrennt und geschützt sichern. Ohne denselben Schlüssel sind noch nicht zugestellte Warteschlangen-Einträge nicht lesbar. Backups enthalten personenbezogene Daten und müssen geschützt aufbewahrt und nach eigener Frist gelöscht werden.
 
 Wiederherstellung: Anwendung anhalten, vorhandene Datenbank inklusive WAL-/SHM-Dateien **als Sicherung in einen anderen Ordner verschieben**, gewähltes Backup an `DATABASE_PATH` wiederherstellen und Besitz-/Zugriffsrechte prüfen. Danach mit derselben Umgebung starten und Kalender-/Mailwarteschlange kontrollieren. Ein Restore kann bereits zugestellte Mails erneut auslösen; Kalendereinträge werden anhand stabiler IDs abgeglichen.
 
@@ -161,6 +188,6 @@ npm audit --omit=dev --audit-level=high
 
 Die Tests decken Freigabequoren, Ablehnungen, Mehrfachbuchungen, atomare parallele Genehmigungen mit getrennten Datenbankverbindungen, Konflikte und Sperren, exklusive Intervallgrenzen, Sommer-/Winterzeit, persönliche Tokens, CSRF/PIN/Adminrechte, Datensparsamkeit, SMTP-Fehler und idempotente Google-Synchronisierung ab. Externe Dienste sind in automatischen Tests simuliert; reale SMTP- und Google-Zugangsdaten werden nicht für CI benötigt.
 
-GitHub Actions prüft Linux und Windows, Syntax, Tests, Build, `npm audit` und den Docker-Build. Der Build ist eine Syntax-/Auslieferungsprüfung; das Frontend ist bewusst ohne Bundler nutzbar. Dependabot erstellt tägliche npm-Updates und wöchentliche Docker-/Actions-Updates. Patch und Minor werden gruppiert; Major-Updates bleiben gesonderte PRs. Automatisches Merge und Produktivdeployment sind nicht aktiviert. Sicherheitsmeldungen zusätzlich in den Repository-Einstellungen aktivieren, falls noch nicht aktiv.
+GitHub Actions prüft zusätzlich echte MariaDB- und MySQL-Datenbanken sowie die gesicherte Browser-Einrichtung und prüft auf Linux und Windows, Syntax, Tests, Build, `npm audit` und den Docker-Build. Der Build ist eine Syntax-/Auslieferungsprüfung; das Frontend ist bewusst ohne Bundler nutzbar. Dependabot erstellt tägliche npm-Updates und wöchentliche Docker-/Actions-Updates. Patch und Minor werden gruppiert; Major-Updates bleiben gesonderte PRs. Automatisches Merge und Produktivdeployment sind nicht aktiviert. Sicherheitsmeldungen zusätzlich in den Repository-Einstellungen aktivieren, falls noch nicht aktiv.
 
 Vor einem produktiven Einsatz: echte SMTP-Zustellung, Google-Schreibrechte und das Zieldeployment prüfen und die initialen Zugangsdaten selbst wählen.

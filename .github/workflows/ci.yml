@@ -27,3 +27,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t blaulichtbooking:test .
+  sql-database:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        database: ["mariadb:10.11", "mysql:8.4"]
+    services:
+      sql:
+        image: ${{ matrix.database }}
+        env:
+          MYSQL_ROOT_PASSWORD: root-test-password
+          MYSQL_DATABASE: booking_test
+          MYSQL_USER: booking_test
+          MYSQL_PASSWORD: test-only-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot-test-password || mariadb-admin ping -h 127.0.0.1 -uroot -proot-test-password"
+          --health-interval=10s --health-timeout=5s --health-retries=12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm test
+        env:
+          TEST_MARIADB_HOST: 127.0.0.1
+          TEST_MARIADB_DATABASE: booking_test
+          TEST_MARIADB_USER: booking_test
+          TEST_MARIADB_PASSWORD: test-only-password

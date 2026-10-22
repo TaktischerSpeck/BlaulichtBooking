@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>BlaulichtBooking einrichten</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/setup.js" type="module"></script>
+  </head>
+  <body>
+    <main class="page link-page">
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">BlaulichtBooking · Erster Start</div>
+          <h1>In wenigen Schritten startklar.</h1>
+          <p>Datenbank verbinden und euren Zugang einrichten.</p>
+        </div>
+      </div>
+      <div class="notice">
+        Lege zuerst in Plesk unter <strong>Datenbanken</strong> eine leere
+        MariaDB-/MySQL-Datenbank mit Benutzer an. Setze unter
+        <strong>Node.js → Umgebungsvariablen</strong> einen selbst gewählten
+        <strong>SETUP_TOKEN</strong> mit mindestens 16 Zeichen und starte die
+        App neu. Dieser Code schützt die einmalige Einrichtung.
+      </div>
+      <form id="setup-form" class="panel panel-body">
+        <div id="setup-error" class="error" role="alert" hidden></div>
+        <h2>1. Einrichtung freischalten</h2>
+        <br />
+        <div class="field">
+          <label for="setupToken">Einrichtungscode aus Plesk</label
+          ><input
+            id="setupToken"
+            name="setupToken"
+            type="password"
+            minlength="16"
+            required
+            autocomplete="off"
+          />
+        </div>
+        <div class="fields">
+          <div class="field">
+            <label for="siteName">Name der Feuerwehr</label
+            ><input
+              id="siteName"
+              name="siteName"
+              value="Feuerwehr Ober-Ramstadt"
+              maxlength="100"
+              required
+            />
+          </div>
+          <div class="field">
+            <label for="baseUrl">Website-Adresse</label
+            ><input id="baseUrl" name="baseUrl" type="url" required />
+          </div>
+        </div>
+        <div class="divider"></div>
+        <h2>2. Datenbank verbinden</h2>
+        <br />
+        <div class="field">
+          <label for="databaseType">Datenbanktyp</label
+          ><select id="databaseType" name="databaseType">
+            <option value="mariadb">MariaDB / MySQL (Plesk)</option>
+            <option value="sqlite">SQLite (lokale Datei)</option>
+          </select>
+        </div>
+        <section id="sql-fields">
+          <div class="fields">
+            <div class="field">
+              <label for="dbHost">Datenbankserver</label
+              ><input
+                id="dbHost"
+                name="dbHost"
+                value="127.0.0.1"
+                maxlength="250"
+                required
+              /><small
+                >Bei einer Datenbank auf demselben Plesk-Server meist
+                127.0.0.1.</small
+              >
+            </div>
+            <div class="field">
+              <label for="dbPort">Port</label
+              ><input
+                id="dbPort"
+                name="dbPort"
+                type="number"
+                value="3306"
+                min="1"
+                max="65535"
+                required
+              />
+            </div>
+          </div>
+          <div class="fields">
+            <div class="field">
+              <label for="dbName">Datenbankname aus Plesk</label
+              ><input
+                id="dbName"
+                name="dbName"
+                maxlength="100"
+                required
+                autocomplete="off"
+              />
+            </div>
+            <div class="field">
+              <label for="dbUser">Datenbankbenutzer aus Plesk</label
+              ><input
+                id="dbUser"
+                name="dbUser"
+                maxlength="100"
+                required
+                autocomplete="off"
+              />
+            </div>
+          </div>
+          <div class="field">
+            <label for="dbPassword">Datenbankpasswort</label
+            ><input
+              id="dbPassword"
+              name="dbPassword"
+              type="password"
+              autocomplete="off"
+            />
+          </div>
+          <label class="checkbox"
+            ><input name="dbSsl" type="checkbox" />TLS für einen externen
+            Datenbankserver verwenden</label
+          >
+        </section>
+        <div class="notice">
+          Die Datenbank muss bereits in Plesk existieren. Alle benötigten
+          Tabellen werden automatisch angelegt. Eine vorhandene SQLite-Datei
+          wird durch die Auswahl von MariaDB nicht übertragen.
+        </div>
+        <div class="divider"></div>
+        <h2>3. Zugang festlegen</h2>
+        <br />
+        <div class="field">
+          <label for="pin">Gemeinsame Website-PIN</label
+          ><input
+            id="pin"
+            name="pin"
+            type="password"
+            inputmode="numeric"
+            pattern="[0-9]{4}"
+            minlength="4"
+            maxlength="4"
+            autocomplete="new-password"
+            required
+          />
+        </div>
+        <div class="fields">
+          <div class="field">
+            <label for="adminUsername">Admin-Benutzername</label
+            ><input
+              id="adminUsername"
+              name="adminUsername"
+              maxlength="100"
+              autocomplete="username"
+              required
+            />
+          </div>
+          <div class="field">
+            <label for="adminPassword"
+              >Admin-Passwort (mindestens 12 Zeichen)</label
+            ><input
+              id="adminPassword"
+              name="adminPassword"
+              type="password"
+              minlength="12"
+              maxlength="256"
+              autocomplete="new-password"
+              required
+            />
+          </div>
+        </div>
+        <div class="divider"></div>
+        <h2>4. E-Mail-Versand (optional)</h2>
+        <p class="privacy">
+          Für Bestätigungs- und Freigabelinks wird SMTP benötigt. Du kannst die
+          Werte auch später in Plesk als Umgebungsvariablen setzen.
+        </p>
+        <br />
+        <div class="fields">
+          <div class="field">
+            <label for="smtpHost">SMTP-Server</label
+            ><input id="smtpHost" name="smtpHost" maxlength="250" />
+          </div>
+          <div class="field">
+            <label for="smtpPort">SMTP-Port</label
+            ><input
+              id="smtpPort"
+              name="smtpPort"
+              type="number"
+              value="587"
+              min="1"
+              max="65535"
+            />
+          </div>
+          <div class="field">
+            <label for="smtpUser">SMTP-Benutzername</label
+            ><input
+              id="smtpUser"
+              name="smtpUser"
+              maxlength="254"
+              autocomplete="off"
+            />
+          </div>
+          <div class="field">
+            <label for="smtpPassword">SMTP-Passwort</label
+            ><input
+              id="smtpPassword"
+              name="smtpPassword"
+              type="password"
+              autocomplete="off"
+            />
+          </div>
+        </div>
+        <div class="field">
+          <label for="smtpFrom">Absenderadresse</label
+          ><input id="smtpFrom" name="smtpFrom" type="email" />
+        </div>
+        <label class="checkbox"
+          ><input name="smtpSecure" type="checkbox" />Implizites TLS (Port 465).
+          Ohne Häkchen: STARTTLS (Port 587).</label
+        >
+        <div class="notice">
+          Datenbankzugang und automatisch erzeugter Anwendungsschlüssel werden
+          im geschützten Datenverzeichnis außerhalb des öffentlichen Ordners
+          gespeichert. PIN und Admin-Passwort werden ausschließlich als Hash in
+          der Datenbank abgelegt.
+        </div>
+        <button class="btn primary" type="submit" id="install">
+          Verbindung prüfen & Einrichtung abschließen
+        </button>
+        <p
+          id="setup-status"
+          class="privacy"
+          role="status"
+          aria-live="polite"
+        ></p>
+      </form>
+    </main>
+  </body>
+</html>
